@@ -5,11 +5,18 @@ import pandas as pd
 
 
 def _get_secrets():
+    # Debug: Check what's available in secrets
+    available_keys = []
+    try:
+        available_keys = list(st.secrets.keys())
+    except Exception as e:
+        pass
+    
     # 1) Prefer explicit `snowflake` section in Streamlit secrets
     try:
         if "snowflake" in st.secrets:
-            return st.secrets["snowflake"]
-    except Exception:
+            return dict(st.secrets["snowflake"])
+    except Exception as e:
         pass
 
     # 2) Support a `connections` table like the user's example.
@@ -18,12 +25,13 @@ def _get_secrets():
         if "connections" in st.secrets:
             conns = st.secrets["connections"]
             # If there's a named `snowflake` connection, use it
-            if isinstance(conns, dict) and "snowflake" in conns:
-                return conns["snowflake"]
+            if "snowflake" in conns:
+                return dict(conns["snowflake"])
             # Else, if there are any connections defined, return the first one
-            if isinstance(conns, dict) and conns:
-                return next(iter(conns.values()))
-    except Exception:
+            if conns:
+                first_key = next(iter(conns.keys()))
+                return dict(conns[first_key])
+    except Exception as e:
         pass
 
     # 3) Fallback to environment variables (useful for CI or other deploys)
@@ -39,9 +47,9 @@ def _get_secrets():
     if env.get("user") and env.get("password") and env.get("account"):
         return env
 
-    raise RuntimeError(
-        "Snowflake credentials not found. Provide `st.secrets['snowflake']`, `st.secrets['connections']['snowflake']`, or environment variables."
-    )
+    error_msg = f"Snowflake credentials not found. Available secret keys: {available_keys}. "
+    error_msg += "Provide `st.secrets['snowflake']`, `st.secrets['connections']['snowflake']`, or environment variables."
+    raise RuntimeError(error_msg)
 
 
 def get_connection():
