@@ -6,19 +6,25 @@ import pandas as pd
 
 def _get_secrets():
     # 1) Prefer explicit `snowflake` section in Streamlit secrets
-    if "snowflake" in st.secrets:
-        return st.secrets["snowflake"]
+    try:
+        if "snowflake" in st.secrets:
+            return st.secrets["snowflake"]
+    except Exception:
+        pass
 
     # 2) Support a `connections` table like the user's example.
     #    Example supported key: [connections.snowflake]
-    if "connections" in st.secrets:
-        conns = st.secrets["connections"]
-        # If there's a named `snowflake` connection, use it
-        if isinstance(conns, dict) and "snowflake" in conns:
-            return conns["snowflake"]
-        # Else, if there are any connections defined, return the first one
-        if isinstance(conns, dict) and conns:
-            return next(iter(conns.values()))
+    try:
+        if "connections" in st.secrets:
+            conns = st.secrets["connections"]
+            # If there's a named `snowflake` connection, use it
+            if isinstance(conns, dict) and "snowflake" in conns:
+                return conns["snowflake"]
+            # Else, if there are any connections defined, return the first one
+            if isinstance(conns, dict) and conns:
+                return next(iter(conns.values()))
+    except Exception:
+        pass
 
     # 3) Fallback to environment variables (useful for CI or other deploys)
     env = {
@@ -30,7 +36,7 @@ def _get_secrets():
         "schema": os.getenv("SNOWFLAKE_SCHEMA"),
         "role": os.getenv("SNOWFLAKE_ROLE"),
     }
-    if env["user"] and env["password"] and env["account"]:
+    if env.get("user") and env.get("password") and env.get("account"):
         return env
 
     raise RuntimeError(
@@ -83,7 +89,12 @@ st.set_page_config(page_title="Americas Addresses Dashboard", layout="wide")
 st.title("Americas Address Data from Snowflake")
 
 # Ensure secrets are present (check updated to support both formats)
-if "snowflake" not in st.secrets and "connections" not in st.secrets:
+try:
+    secrets_available = "snowflake" in st.secrets or "connections" in st.secrets
+except Exception:
+    secrets_available = False
+
+if not secrets_available:
     st.error(
         "Snowflake credentials missing. Add them to Streamlit secrets as `[snowflake]` or `[connections.snowflake]`."
     )
